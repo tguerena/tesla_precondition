@@ -1,0 +1,72 @@
+blueprint:
+  name: Tesla Climate Control
+  description: Control your Tesla's climate based on interior and exterior temperature
+    readings at specific times.
+  domain: automation
+  input:
+    tesla_interior_temp:
+      name: Tesla Interior Temperature Sensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    tesla_exterior_temp:
+      name: Tesla Exterior Temperature Sensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    time_trigger_1:
+      name: Time Trigger 1
+      selector:
+        time: {}
+    time_trigger_2:
+      name: Time Trigger 2
+      selector:
+        time: {}
+    temp_offset:
+      name: Temperature Offset
+      description: The temperature difference required to trigger seat heater.
+      selector:
+        number:
+          min: 0
+          max: 10
+          unit_of_measurement: "°C"
+    seat_heater:
+      name: Seat Heater Control
+      selector:
+        boolean: {}
+    vent_windows:
+      name: Vent Windows Control
+      selector:
+        boolean: {}
+  source_url: https://www.home-assistant.io/docs/blueprint/
+trigger:
+- platform: time
+  at: '{{ time_trigger_1 }}'
+- platform: time
+  at: '{{ time_trigger_2 }}'
+variables:
+  interior_temp: '{{ states(''sensor.tesla_interior_temp'') }}'
+  exterior_temp: '{{ states(''sensor.tesla_exterior_temp'') }}'
+action:
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ (interior_temp | float) - (exterior_temp | float) > 5 }}'
+    - condition: template
+      value_template: '{{ (exterior_temp | float) - (interior_temp | float) >= temp_offset }}'
+    sequence:
+    - service: tesla_custom.vent_windows
+    - service: tesla_custom.precondition
+    - condition: template
+      value_template: '{{ seat_heater }}'
+    - service: tesla_custom.turn_on_seat_heater
+  - conditions:
+    - condition: template
+      value_template: '{{ (interior_temp | float) - (exterior_temp | float) <= 5 }}'
+    sequence:
+    - condition: template
+      value_template: '{{ vent_windows }}'
+    - service: tesla_custom.vent_windows
+    - service: tesla_custom.precondition
